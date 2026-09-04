@@ -73,7 +73,7 @@ function startBot() {
       port: SERVER_PORT,
       username: BOT_USERNAME,
       offline: OFFLINE_MODE,
-      version: '1.26.45',
+      version: '1.26.40',
       connectTimeout: 10000,
       skipPing: true
     });
