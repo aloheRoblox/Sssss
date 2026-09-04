@@ -78,23 +78,23 @@ function startBot() {
       skipPing: true
     });
 
-    // Handle Resource Pack Handshake
+    // Resource pack response
     client.on('resource_packs_info', () => {
-      console.log('[PACKS] Server sent resource packs info. Responding...');
+      console.log('[PACKS] Responding to server resource packs...');
       client.write('resource_pack_client_response', {
         response_status: 'completed',
         resourcepackids: []
       });
     });
 
-    // Log explicit disconnect reason from Minecraft server
+    // Server kick reason
     client.on('disconnect', (packet) => {
       const reason = packet.reason || packet.message || JSON.stringify(packet);
       console.log(`[KICKED BY SERVER] Reason: ${reason}`);
       sendDiscordMessage(`⚠️ **[KICKED BY SERVER]** Reason: \`${reason}\``);
     });
 
-    // Track online players
+    // Player list
     client.on('player_list', (packet) => {
       if (packet.records && packet.records.records) {
         for (const record of packet.records.records) {
@@ -117,7 +117,7 @@ function startBot() {
       }, 3000);
     });
 
-    // Auto-respawn on death
+    // Auto-respawn
     client.on('set_health', (packet) => {
       if (packet.health <= 0) {
         console.log('[DEATH] Bot died, sending respawn packet...');
@@ -138,7 +138,7 @@ function startBot() {
       });
     });
 
-    // Forward game chat to Discord
+    // Chat forwarding
     client.on('text', (packet) => {
       const author = packet.source_name || packet.author || 'Server';
       const message = packet.message;
@@ -152,13 +152,11 @@ function startBot() {
       }
     });
 
-    // Handle disconnects
     client.on('close', () => {
       console.log('[WARNING] Connection lost or closed.');
       safeReconnect();
     });
 
-    // Handle errors
     client.on('error', (err) => {
       console.error('[ERROR]', err.message || err);
       safeReconnect();
@@ -170,97 +168,4 @@ function startBot() {
   }
 }
 
-// Start
-startBot();
-  }
-
-  console.log(`[BOT] Connecting to ${SERVER_HOST}:${SERVER_PORT}...`);
-
-  try {
-    client = bedrock.createClient({
-      host: SERVER_HOST,
-      port: SERVER_PORT,
-      username: BOT_USERNAME,
-      offline: OFFLINE_MODE,
-      connectTimeout: 7000 // 7 seconds connection timeout limit
-    });
-
-    // Track online players
-    client.on('player_list', (packet) => {
-      if (packet.records && packet.records.records) {
-        for (const record of packet.records.records) {
-          if (packet.records.type === 'add') {
-            if (record.username) playersList.add(record.username);
-          } else if (packet.records.type === 'remove') {
-            playersList.delete(record.username);
-          }
-        }
-      }
-    });
-
-    // Successful join
-    client.on('join', () => {
-      console.log(`[SUCCESS] Bot "${BOT_USERNAME}" joined the server!`);
-      
-      setTimeout(() => {
-        const onlineCount = playersList.size > 0 ? playersList.size : 'Unknown';
-        sendDiscordMessage(`✅ **[BOT JOINED]**\n🟢 Username: \`${BOT_USERNAME}\`\n📊 Online Players: **${onlineCount}**`);
-      }, 3000);
-    });
-
-    // Auto-respawn on death
-    client.on('set_health', (packet) => {
-      if (packet.health <= 0) {
-        console.log('[DEATH] Bot died, sending respawn packet...');
-        
-        client.write('respawn', {
-          state: 0,
-          runtime_entity_id: client.entityId || 0
-        });
-
-        sendDiscordMessage(`💀 **[BOT DIED]** Bot automatically respawned!`);
-      }
-    });
-
-    client.on('respawn', () => {
-      client.write('respawn', {
-        state: 0,
-        runtime_entity_id: client.entityId || 0
-      });
-    });
-
-    // Forward game chat to Discord
-    client.on('text', (packet) => {
-      const author = packet.source_name || packet.author || 'Server';
-      const message = packet.message;
-
-      if (message && message.trim() !== '') {
-        console.log(`[CHAT] ${author}: ${message}`);
-        
-        if (author !== BOT_USERNAME) {
-          sendDiscordMessage(`💬 **[CHAT] ${author}:** ${message}`);
-        }
-      }
-    });
-
-    // Handle disconnects
-    client.on('close', () => {
-      console.log('[WARNING] Connection lost or closed.');
-      sendDiscordMessage(`🔴 **[DISCONNECTED]** Connection lost. Reconnecting in 5s...`);
-      safeReconnect();
-    });
-
-    // Handle errors (e.g. server offline or connection timeout)
-    client.on('error', (err) => {
-      console.error('[ERROR]', err.message || err);
-      safeReconnect();
-    });
-
-  } catch (err) {
-    console.error('[EXCEPTION]', err.message || err);
-    safeReconnect();
-  }
-}
-
-// Start bot
 startBot();
