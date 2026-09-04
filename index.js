@@ -2,8 +2,8 @@ const bedrock = require('bedrock-protocol');
 const express = require('express');
 
 // Environment variables
-const SERVER_HOST = process.env.SERVER_HOST || 'your-server-ip.aternos.me';
-const SERVER_PORT = parseInt(process.env.SERVER_PORT || '19132', 10);
+const SERVER_HOST = process.env.SERVER_HOST || 'Rickandmorty124.aternos.me';
+const SERVER_PORT = parseInt(process.env.SERVER_PORT || '34168', 10);
 const BOT_USERNAME = process.env.BOT_USERNAME || 'AFK_Bot_Bedrock';
 const OFFLINE_MODE = process.env.OFFLINE_MODE !== 'false';
 
@@ -39,17 +39,43 @@ async function sendDiscordMessage(content) {
 // 2. Bot logic
 let client = null;
 let playersList = new Set();
+let reconnectTimeout = null;
+
+// Safe reconnect mechanism with 5 seconds delay
+function safeReconnect() {
+  if (reconnectTimeout) return; // Prevent multiple reconnect timers
+
+  if (client) {
+    try {
+      client.removeAllListeners();
+    } catch (e) {}
+    client = null;
+  }
+  
+  playersList.clear();
+  console.log('[RETRY] Reconnecting in 5 seconds...');
+
+  reconnectTimeout = setTimeout(() => {
+    reconnectTimeout = null;
+    startBot();
+  }, 5000);
+}
 
 function startBot() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+
   console.log(`[BOT] Connecting to ${SERVER_HOST}:${SERVER_PORT}...`);
 
   try {
-    // Auto-detect server version
     client = bedrock.createClient({
       host: SERVER_HOST,
       port: SERVER_PORT,
       username: BOT_USERNAME,
-      offline: OFFLINE_MODE
+      offline: OFFLINE_MODE,
+      connectTimeout: 7000 // 7 seconds connection timeout limit
     });
 
     // Track online players
@@ -110,23 +136,24 @@ function startBot() {
       }
     });
 
-    // Handle disconnects & auto-reconnect
+    // Handle disconnects
     client.on('close', () => {
-      console.log('[WARNING] Connection lost. Reconnecting in 15 seconds...');
-      sendDiscordMessage(`🔴 **[DISCONNECTED]** Connection lost. Reconnecting in 15s...`);
-      playersList.clear();
-      setTimeout(startBot, 15000);
+      console.log('[WARNING] Connection lost or closed.');
+      sendDiscordMessage(`🔴 **[DISCONNECTED]** Connection lost. Reconnecting in 5s...`);
+      safeReconnect();
     });
 
+    // Handle errors (e.g. server offline or connection timeout)
     client.on('error', (err) => {
       console.error('[ERROR]', err.message || err);
+      safeReconnect();
     });
 
   } catch (err) {
     console.error('[EXCEPTION]', err.message || err);
-    setTimeout(startBot, 15000);
+    safeReconnect();
   }
 }
 
-// Start
+// Start bot
 startBot();
